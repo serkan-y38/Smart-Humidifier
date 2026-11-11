@@ -100,6 +100,7 @@ export async function readingsRoutes(fastify) {
     fastify.get(
         '/api/readings',
         {
+            preValidation: requireApiKey,
             schema: {
                 querystring: {
                     type: 'object',
@@ -107,13 +108,14 @@ export async function readingsRoutes(fastify) {
                     properties: {
                         from: {type: 'string'},
                         to: {type: 'string'},
+                        interval: {type: 'integer', minimum: 1, maximum: 86400},
                         limit: {type: 'integer', minimum: 1, maximum: 2000, default: 120}
                     }
                 }
             }
         },
         async (request, reply) => {
-            const {from, to, limit} = request.query;
+            const {from, to, interval, limit} = request.query;
             const nowTs = nowUnixSeconds();
 
             let fromTs = null;
@@ -142,22 +144,44 @@ export async function readingsRoutes(fastify) {
             }
 
             const conditions = [];
-            const params = [];
+            const whereParams = [];
 
             if (fromTs !== null) {
                 conditions.push('ts >= ?');
-                params.push(fromTs);
+                whereParams.push(fromTs);
             }
 
             if (toTs !== null) {
                 conditions.push('ts <= ?');
-                params.push(toTs);
+                whereParams.push(toTs);
             }
 
             const whereClause =
                 conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-            params.push(Number(limit));
+            if (interval !== undefined) {
+                const sql = `
+                    SELECT (ts DIV ?) * ?             AS bucket_ts,
+                           ROUND(AVG(humidity), 1)    AS humidity,
+                           ROUND(AVG(temperature), 1) AS temperature,
+                           MAX(relay)                 AS relay,
+                           COUNT(*)                   AS samples
+                    FROM readings ${whereClause}
+                    GROUP BY bucket_ts
+                    ORDER BY bucket_ts DESC LIMIT ?
+                `;
+
+                const params = [interval, interval, ...whereParams, Number(limit)];
+                const [rows] = await pool.query(sql, params);
+
+                return rows.reverse().map((row) => ({
+                    ts: Number(row.bucket_ts),
+                    humidity: Number(row.humidity),
+                    temperature: Number(row.temperature),
+                    relay: Boolean(row.relay),
+                    samples: Number(row.samples)
+                }));
+            }
 
             const sql = `
                 SELECT ts, humidity, temperature, relay, created_at
@@ -167,7 +191,7 @@ export async function readingsRoutes(fastify) {
                 ORDER BY ts ASC, id ASC
             `;
 
-            const [rows] = await pool.query(sql, params);
+            const [rows] = await pool.query(sql, [...whereParams, Number(limit)]);
 
             return rows.map((row) => ({
                 ts: Number(row.ts),

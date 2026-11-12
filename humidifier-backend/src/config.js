@@ -17,20 +17,3 @@ export const config = {
         queueLimit: 0
     }
 };
-
-/**
- * // Do not forget to create .env file
- *
- * # API && Server Settings
- * PORT=8000
- * API_KEY=key
- * CORS_ORIGIN=http://localhost:5000
- *
- * # DB Settings
- * DB_HOST=localhost
- * DB_PORT=3306
- * DB_USER=root
- * DB_PASSWORD=password
- * DB_NAME=humidifier
- */
-

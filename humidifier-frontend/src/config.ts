@@ -3,7 +3,7 @@ const rawBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 export const VITE_API_BASE_URL: string =
     rawBaseUrl && rawBaseUrl.length > 0
         ? rawBaseUrl.replace(/\/+$/, '')
-        : 'http://localhost:8000';
+        : 'http://localhost:3839';
 
 export const VITE_API_KEY: string = import.meta.env.VITE_API_KEY?.trim() ?? '';
 
